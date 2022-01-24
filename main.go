@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -15,12 +17,15 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/jsonpath"
+
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
+
+var ObjEncoder = jsonpath.New("output")
 
 func main() {
 
@@ -28,13 +33,15 @@ func main() {
 		kubeconfig        string
 		kubeconfigDefault = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 		//clusterContext    string
-		namespace    string
-		resourceName string
+		namespace      string
+		resourceName   string
+		formatJsonPath string
 	)
 
 	flag.StringVar(&kubeconfig, "kubeconfig", kubeconfigDefault, "kube config path")
 	flag.StringVar(&resourceName, "resource", "", "kube resource name")
-	flag.StringVar(&namespace, "n", v1.NamespaceDefault, "kube namespace")
+	flag.StringVar(&namespace, "n", v1.NamespaceAll, "kube namespace")
+	flag.StringVar(&formatJsonPath, "jsonpath", "{@}", "kube resource jsonpath")
 	//flag.StringVar(&clusterContext, "context", "", "kube context (only use outside cluster)")
 	flag.Parse()
 
@@ -43,6 +50,11 @@ func main() {
 			log.Println(err, "\n", string(debug.Stack()))
 		}
 	}()
+
+	err := ObjEncoder.Parse(formatJsonPath)
+	if err != nil {
+		panic(err)
+	}
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil && kubeconfig == kubeconfigDefault {
@@ -68,6 +80,7 @@ func main() {
 	var allResource = map[string]runtime.Object{
 		"services": &v1.Service{},
 		"pods":     &v1.Pod{},
+		"nodes":    &v1.Node{},
 	}
 
 	t, exists := allResource[resourceName]
@@ -81,13 +94,27 @@ func main() {
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				fmt.Println(resourceName, "add", obj)
+				buf := bytes.NewBuffer(nil)
+				fmt.Fprint(buf, "add ")
+				encode(buf, obj)
+				buf.Write([]byte{'\n'})
+				notify(buf)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				fmt.Println(resourceName, oldObj, "->", newObj)
+				buf := bytes.NewBuffer(nil)
+				fmt.Fprint(buf, "update ")
+				encode(buf, oldObj)
+				fmt.Fprint(buf, " to ")
+				encode(buf, newObj)
+				buf.Write([]byte{'\n'})
+				notify(buf)
 			},
 			DeleteFunc: func(obj interface{}) {
-				fmt.Println(resourceName, "delete", obj)
+				buf := bytes.NewBuffer(nil)
+				fmt.Fprint(buf, "delete ")
+				encode(buf, obj)
+				buf.Write([]byte{'\n'})
+				notify(buf)
 			},
 		})
 
@@ -99,4 +126,12 @@ func main() {
 	<-sig
 	stop <- struct{}{}
 	time.Sleep(time.Second * 1)
+}
+
+func encode(w io.Writer, obj interface{}) error {
+	return ObjEncoder.Execute(w, obj)
+}
+
+func notify(buf *bytes.Buffer) {
+	io.Copy(os.Stdout, buf)
 }
