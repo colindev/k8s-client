@@ -9,3 +9,7 @@ resources:
 - deploy.yaml
 - sa.yaml
 - rbac.yaml
+
+images:
+- name: gcr.io/rd-resources/k8s-client
+  newTag: v0.0.3

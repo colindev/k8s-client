@@ -64,6 +64,7 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
+		log.Println("use rest.InClusterConfig..")
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
