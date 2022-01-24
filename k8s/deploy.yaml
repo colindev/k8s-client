@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-client
+spec:
+  replicas: 1
+  template:
+    spec:
+      serviceAccountName: k8s-client
+      containers:
+      - name: k8s-client
+        image: gcr.io/rd-resources/k8s-client:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - k8sclient
+        - -resource=nodes
+        - jsonpath='{.status.addresses[0].address}'

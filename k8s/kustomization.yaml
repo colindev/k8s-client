@@ -1,0 +1,11 @@
+kind: Kustomization
+
+commonLabels:
+  app: k8s-client
+
+namespace: default
+
+resources:
+- deploy.yaml
+- sa.yaml
+- rbac.yaml
