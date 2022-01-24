@@ -14,4 +14,4 @@ spec:
         command:
         - k8sclient
         - -resource=nodes
-        - jsonpath='{.status.addresses[0].address}'
+        - -jsonpath='{.status.addresses[0].address}'

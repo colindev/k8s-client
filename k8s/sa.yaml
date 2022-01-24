@@ -1,6 +1,4 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  annotations:
-    #iam.gke.io/gcp-service-account: colin-test@rd-gateway.iam.gserviceaccount.com
   name: k8s-client
